@@ -18,7 +18,7 @@ class UpscaleGUI:
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
 
-        self.scale_percent_var = tk.StringVar(value="1027")
+        self.scale_percent_var = tk.StringVar(value="1027.636")
         self.dpi_var = tk.StringVar(value="300")
         self.bleed_var = tk.StringVar(value="1.0")
 
