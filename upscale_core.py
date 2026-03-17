@@ -51,12 +51,42 @@ def iter_images(input_dir: Path, recursive: bool) -> Iterable[Path]:
 
 
 def ensure_mode(img: Image.Image) -> Image.Image:
-    if img.mode in ("RGB", "RGBA"):
+    """
+    Preserve CMYK when present.
+    Only convert modes that are awkward for processing.
+    """
+    if img.mode in ("RGB", "RGBA", "CMYK"):
         return img
+
+    if img.mode == "P":
+        return img.convert("RGB")
+
+    if img.mode == "L":
+        return img.convert("RGB")
+
     if "A" in img.getbands():
         return img.convert("RGBA")
+
     return img.convert("RGB")
 
+def ensure_mode(img: Image.Image) -> Image.Image:
+    """
+    Preserve CMYK when present.
+    Only convert modes that are awkward for processing.
+    """
+    if img.mode in ("RGB", "RGBA", "CMYK"):
+        return img
+
+    if img.mode == "P":
+        return img.convert("RGB")
+
+    if img.mode == "L":
+        return img.convert("RGB")
+
+    if "A" in img.getbands():
+        return img.convert("RGBA")
+
+    return img.convert("RGB")
 
 def quantize_color(pixel: tuple[int, int, int], step: int = 8) -> tuple[int, int, int]:
     r, g, b = pixel[:3]
@@ -86,10 +116,15 @@ def get_dominant_color(img: Image.Image) -> tuple[int, int, int]:
     return Counter(filtered).most_common(1)[0][0]
 
 
-def get_auto_background_fill(img: Image.Image) -> tuple[int, int, int] | tuple[int, int, int, int]:
+def get_auto_background_fill(
+    img: Image.Image,
+) -> tuple[int, int, int] | tuple[int, int, int, int] | tuple[int, int, int, int]:
     dominant = get_dominant_color(img)
+
     if img.mode == "RGBA":
         return dominant + (0,)
+    if img.mode == "CMYK":
+        return rgb_to_cmyk(dominant)
     return dominant
 
 
@@ -98,6 +133,18 @@ def get_background_fill(
     background_mode: str,
     custom_color: tuple[int, int, int] | None,
 ) -> tuple[int, int, int] | tuple[int, int, int, int]:
+    if img.mode == "CMYK":
+        if background_mode == "transparent":
+            # CMYK has no alpha, so use white as the safest fallback
+            return (0, 0, 0, 0)
+        if background_mode == "white":
+            return (0, 0, 0, 0)
+        if background_mode == "black":
+            return (0, 0, 0, 255)
+        if background_mode == "custom" and custom_color is not None:
+            return rgb_to_cmyk(custom_color)
+        return get_auto_background_fill(img)
+
     if background_mode == "transparent":
         return (0, 0, 0, 0) if img.mode == "RGBA" else (255, 255, 255)
     if background_mode == "white":
@@ -155,6 +202,8 @@ def add_bleed_dominant(
 
     if img.mode == "RGBA":
         fill = dominant + (255,)
+    elif img.mode == "CMYK":
+        fill = rgb_to_cmyk(dominant)
     else:
         fill = dominant
 
@@ -366,17 +415,31 @@ def save_with_dpi(img: Image.Image, out_path: Path, dpi: int, quality: int) -> N
 
     save_kwargs = {"dpi": (dpi, dpi)}
 
+    icc_profile = img.info.get("icc_profile")
+    if icc_profile:
+        save_kwargs["icc_profile"] = icc_profile
+
     if ext in (".jpg", ".jpeg"):
         if img.mode == "RGBA":
             background = Image.new("RGB", img.size, (255, 255, 255))
             background.paste(img, mask=img.getchannel("A"))
             img = background
-        elif img.mode != "RGB":
+        elif img.mode not in ("RGB", "CMYK"):
             img = img.convert("RGB")
+
         save_kwargs.update({"quality": quality, "optimize": True, "progressive": True})
+
     elif ext == ".png":
+        if img.mode == "CMYK":
+            # PNG does not support CMYK well in normal workflows; convert safely
+            img = img.convert("RGB")
+            save_kwargs.pop("icc_profile", None)
         save_kwargs.update({"optimize": True})
+
     elif ext == ".webp":
+        if img.mode == "CMYK":
+            img = img.convert("RGB")
+            save_kwargs.pop("icc_profile", None)
         save_kwargs.update({"quality": quality, "method": 6})
 
     img.save(out_path, **save_kwargs)
