@@ -22,8 +22,7 @@ RESAMPLE_MAP = {
 class UpscaleSettings:
     input_dir: Path
     output_dir: Path
-    out_width_inches: float = 12.0
-    out_height_inches: float = 12.0
+    scale_percent: float = 1027.0
     dpi: int = 300
     bleed_inches: float = 1.0
     bleed_mode: str = "dominant"  # dominant, edge, mirror, custom
@@ -281,10 +280,8 @@ def process_one_image(src: Path, settings: UpscaleSettings) -> tuple[bool, str]:
     if out_path.exists() and not settings.overwrite:
         return False, f"[SKIP] {src.name} -> already exists"
 
-    target_width_px = int(round(settings.out_width_inches * settings.dpi))
-    target_height_px = int(round(settings.out_height_inches * settings.dpi))
     bleed_px = int(round(settings.bleed_inches * settings.dpi))
-    target_size = (target_width_px, target_height_px)
+    scale_factor = settings.scale_percent / 100.0
 
     with Image.open(src) as img:
         img.load()
@@ -292,6 +289,11 @@ def process_one_image(src: Path, settings: UpscaleSettings) -> tuple[bool, str]:
 
         if settings.pad_to_square:
             img = pad_to_square(img, settings.background_mode, settings.custom_background_color)
+
+        original_width, original_height = img.size
+        target_width_px = max(1, int(round(original_width * scale_factor)))
+        target_height_px = max(1, int(round(original_height * scale_factor)))
+        target_size = (target_width_px, target_height_px)
 
         resample = RESAMPLE_MAP[settings.resample]
         if settings.two_step:
@@ -317,7 +319,7 @@ def process_one_image(src: Path, settings: UpscaleSettings) -> tuple[bool, str]:
 def process_batch(
     settings: UpscaleSettings,
     progress_callback: Callable[[int, int, str], None] | None = None,
-) -> dict[str, int]:
+) -> dict[str, int | float]:
     if not settings.input_dir.exists():
         raise FileNotFoundError(f"Input folder not found: {settings.input_dir}")
     if not settings.input_dir.is_dir():
@@ -328,6 +330,25 @@ def process_batch(
     files = list(iter_images(settings.input_dir, settings.recursive))
     total = len(files)
     saved = skipped = failed = 0
+
+    preview_width_px = 0
+    preview_height_px = 0
+    final_width_px = 0
+    final_height_px = 0
+    bleed_px = int(round(settings.bleed_inches * settings.dpi))
+    scale_factor = settings.scale_percent / 100.0
+
+    if files:
+        with Image.open(files[0]) as preview_img:
+            preview_img.load()
+            preview_img = ensure_mode(preview_img)
+            if settings.pad_to_square:
+                preview_img = pad_to_square(preview_img, settings.background_mode, settings.custom_background_color)
+
+            preview_width_px = max(1, int(round(preview_img.width * scale_factor)))
+            preview_height_px = max(1, int(round(preview_img.height * scale_factor)))
+            final_width_px = preview_width_px + (2 * bleed_px)
+            final_height_px = preview_height_px + (2 * bleed_px)
 
     for idx, src in enumerate(files, start=1):
         try:
@@ -348,9 +369,13 @@ def process_batch(
         "saved": saved,
         "skipped": skipped,
         "failed": failed,
-        "art_width_px": int(round(settings.out_width_inches * settings.dpi)),
-        "art_height_px": int(round(settings.out_height_inches * settings.dpi)),
-        "bleed_px": int(round(settings.bleed_inches * settings.dpi)),
+        "scale_percent": settings.scale_percent,
+        "art_width_px": preview_width_px,
+        "art_height_px": preview_height_px,
+        "bleed_px": bleed_px,
+        "final_width_px": final_width_px,
+        "final_height_px": final_height_px,
+    }
         "final_width_px": int(round(settings.out_width_inches * settings.dpi)) + 2 * int(round(settings.bleed_inches * settings.dpi)),
         "final_height_px": int(round(settings.out_height_inches * settings.dpi)) + 2 * int(round(settings.bleed_inches * settings.dpi)),
     }
