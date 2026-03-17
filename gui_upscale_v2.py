@@ -120,7 +120,13 @@ class UpscaleGUI:
         ttk.Entry(parent, textvariable=self.threshold_var, width=12).grid(row=5, column=1, sticky="w", padx=6, pady=4)
 
         ttk.Label(parent, text="Bleed Mode").grid(row=6, column=0, sticky="w", pady=4)
-        ttk.Combobox(parent, textvariable=self.bleed_mode_var, values=["dominant", "edge", "mirror", "custom"], state="readonly", width=15).grid(row=6, column=1, sticky="w", padx=6, pady=4)
+        ttk.Combobox(
+    parent,
+    textvariable=self.bleed_mode_var,
+    values=["dominant", "edge", "edge_miter", "mirror", "custom"],
+    state="readonly",
+    width=15,
+).grid(row=6, column=1, sticky="w", padx=6, pady=4)
 
         ttk.Label(parent, text="Custom Bleed Color (R,G,B)").grid(row=7, column=0, sticky="w", pady=4)
         ttk.Entry(parent, textvariable=self.custom_bleed_color_var, width=18).grid(row=7, column=1, sticky="w", padx=6, pady=4)
