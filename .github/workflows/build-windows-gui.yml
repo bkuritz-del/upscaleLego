@@ -8,6 +8,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Check out repo
@@ -27,9 +29,13 @@ jobs:
       - name: Show repo files
         run: dir
 
+      - name: Verify Python can import upscale_core before build
+        run: |
+          python -c "import upscale_core; print(upscale_core.__file__)"
+
       - name: Build GUI executable
         run: |
-          pyinstaller --clean --noconfirm --onefile --windowed --name LEGOPrintUpscaler --paths=. --hidden-import=upscale_core gui_upscale_v2.py
+          pyinstaller --clean --noconfirm LEGOPrintUpscaler.spec
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
