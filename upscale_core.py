@@ -25,7 +25,7 @@ class UpscaleSettings:
     scale_percent: float = 1027.636
     dpi: int = 300
     bleed_inches: float = 1.0
-    bleed_mode: str = "dominant"  # dominant, edge, mirror, custom
+    bleed_mode: str = "dominant"  # dominant, edge, edge_miter, mirror, custom
     custom_bleed_color: tuple[int, int, int] | None = None
     resample: str = "bicubic"
     two_step: bool = True
@@ -239,6 +239,64 @@ def add_bleed_mirror(img: Image.Image, bleed_px: int) -> Image.Image:
     )
     return expanded
 
+def add_bleed_edge_extend_miter(img: Image.Image, bleed_px: int) -> Image.Image:
+    width, height = img.size
+    canvas = Image.new(img.mode, (width + 2 * bleed_px, height + 2 * bleed_px))
+
+    if img.mode == "RGBA":
+        canvas.paste(img, (bleed_px, bleed_px), img)
+    else:
+        canvas.paste(img, (bleed_px, bleed_px))
+
+    top = img.crop((0, 0, width, 1)).resize((width, bleed_px))
+    bottom = img.crop((0, height - 1, width, height)).resize((width, bleed_px))
+    left = img.crop((0, 0, 1, height)).resize((bleed_px, height))
+    right = img.crop((width - 1, 0, width, height)).resize((bleed_px, height))
+
+    canvas.paste(top, (bleed_px, 0))
+    canvas.paste(bottom, (bleed_px, height + bleed_px))
+    canvas.paste(left, (0, bleed_px))
+    canvas.paste(right, (width + bleed_px, bleed_px))
+
+    top_left_h = top.crop((0, 0, bleed_px, bleed_px))
+    top_left_v = left.crop((0, 0, bleed_px, bleed_px))
+
+    top_right_h = top.crop((width - bleed_px, 0, width, bleed_px))
+    top_right_v = right.crop((0, 0, bleed_px, bleed_px))
+
+    bottom_left_h = bottom.crop((0, 0, bleed_px, bleed_px))
+    bottom_left_v = left.crop((0, height - bleed_px, bleed_px, height))
+
+    bottom_right_h = bottom.crop((width - bleed_px, 0, width, bleed_px))
+    bottom_right_v = right.crop((0, height - bleed_px, bleed_px, height))
+
+    def paste_mitered_corner(dest_x: int, dest_y: int, horiz_img: Image.Image, vert_img: Image.Image, corner_name: str) -> None:
+        corner = Image.new(img.mode, (bleed_px, bleed_px))
+        h_pixels = horiz_img.load()
+        v_pixels = vert_img.load()
+        c_pixels = corner.load()
+
+        for y in range(bleed_px):
+            for x in range(bleed_px):
+                if corner_name == "tl":
+                    use_h = y <= x
+                elif corner_name == "tr":
+                    use_h = y <= (bleed_px - 1 - x)
+                elif corner_name == "bl":
+                    use_h = y >= (bleed_px - 1 - x)
+                else:  # br
+                    use_h = y >= x
+
+                c_pixels[x, y] = h_pixels[x, y] if use_h else v_pixels[x, y]
+
+        canvas.paste(corner, (dest_x, dest_y))
+
+    paste_mitered_corner(0, 0, top_left_h, top_left_v, "tl")
+    paste_mitered_corner(width + bleed_px, 0, top_right_h, top_right_v, "tr")
+    paste_mitered_corner(0, height + bleed_px, bottom_left_h, bottom_left_v, "bl")
+    paste_mitered_corner(width + bleed_px, height + bleed_px, bottom_right_h, bottom_right_v, "br")
+
+    return canvas
 
 def add_bleed(
     img: Image.Image,
@@ -250,12 +308,13 @@ def add_bleed(
         return img
     if mode == "edge":
         return add_bleed_edge_extend(img, bleed_px)
+    if mode == "edge_miter":
+        return add_bleed_edge_extend_miter(img, bleed_px)
     if mode == "mirror":
         return add_bleed_mirror(img, bleed_px)
     if mode == "custom":
         return add_bleed_dominant(img, bleed_px, custom_color=custom_color)
     return add_bleed_dominant(img, bleed_px)
-
 
 def get_output_extension(src: Path, output_format_mode: str) -> str:
     if output_format_mode == "same":
