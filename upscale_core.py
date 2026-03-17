@@ -241,6 +241,9 @@ def add_bleed_mirror(img: Image.Image, bleed_px: int) -> Image.Image:
 
 def add_bleed_edge_extend_miter(img: Image.Image, bleed_px: int) -> Image.Image:
     width, height = img.size
+    if bleed_px <= 0:
+        return img
+
     canvas = Image.new(img.mode, (width + 2 * bleed_px, height + 2 * bleed_px))
 
     if img.mode == "RGBA":
@@ -248,16 +251,21 @@ def add_bleed_edge_extend_miter(img: Image.Image, bleed_px: int) -> Image.Image:
     else:
         canvas.paste(img, (bleed_px, bleed_px))
 
-    top = img.crop((0, 0, width, 1)).resize((width, bleed_px))
-    bottom = img.crop((0, height - 1, width, height)).resize((width, bleed_px))
-    left = img.crop((0, 0, 1, height)).resize((bleed_px, height))
-    right = img.crop((width - 1, 0, width, height)).resize((bleed_px, height))
+    # Sample a thicker band than 1 pixel so the extended edges preserve shading/bevel better.
+    sample = max(2, min(bleed_px // 6, 16, width, height))
 
+    top = img.crop((0, 0, width, sample)).resize((width, bleed_px), resample=Image.Resampling.BICUBIC)
+    bottom = img.crop((0, height - sample, width, height)).resize((width, bleed_px), resample=Image.Resampling.BICUBIC)
+    left = img.crop((0, 0, sample, height)).resize((bleed_px, height), resample=Image.Resampling.BICUBIC)
+    right = img.crop((width - sample, 0, width, height)).resize((bleed_px, height), resample=Image.Resampling.BICUBIC)
+
+    # Paste straight edge bleeds
     canvas.paste(top, (bleed_px, 0))
     canvas.paste(bottom, (bleed_px, height + bleed_px))
     canvas.paste(left, (0, bleed_px))
     canvas.paste(right, (width + bleed_px, bleed_px))
 
+    # Corner source patches pulled from the pasted edge strips
     top_left_h = top.crop((0, 0, bleed_px, bleed_px))
     top_left_v = left.crop((0, 0, bleed_px, bleed_px))
 
@@ -270,7 +278,18 @@ def add_bleed_edge_extend_miter(img: Image.Image, bleed_px: int) -> Image.Image:
     bottom_right_h = bottom.crop((width - bleed_px, 0, width, bleed_px))
     bottom_right_v = right.crop((0, height - bleed_px, bleed_px, height))
 
-    def paste_mitered_corner(dest_x: int, dest_y: int, horiz_img: Image.Image, vert_img: Image.Image, corner_name: str) -> None:
+    def blend_pixel(a, b, t: float):
+        if len(a) == 4:
+            return tuple(int(round(a[i] * (1.0 - t) + b[i] * t)) for i in range(4))
+        return tuple(int(round(a[i] * (1.0 - t) + b[i] * t)) for i in range(3))
+
+    def paste_mitered_corner(
+        dest_x: int,
+        dest_y: int,
+        horiz_img: Image.Image,
+        vert_img: Image.Image,
+        corner_name: str,
+    ) -> None:
         corner = Image.new(img.mode, (bleed_px, bleed_px))
         h_pixels = horiz_img.load()
         v_pixels = vert_img.load()
@@ -278,16 +297,29 @@ def add_bleed_edge_extend_miter(img: Image.Image, bleed_px: int) -> Image.Image:
 
         for y in range(bleed_px):
             for x in range(bleed_px):
+                # Compute normalized "distance" from each adjoining edge.
+                # Whichever edge is closer should dominate that pixel.
                 if corner_name == "tl":
-                    use_h = y <= x
+                    dh = y
+                    dv = x
                 elif corner_name == "tr":
-                    use_h = y <= (bleed_px - 1 - x)
+                    dh = y
+                    dv = bleed_px - 1 - x
                 elif corner_name == "bl":
-                    use_h = y >= (bleed_px - 1 - x)
-                else:  # br
-                    use_h = y >= x
+                    dh = bleed_px - 1 - y
+                    dv = x
+                else:  # "br"
+                    dh = bleed_px - 1 - y
+                    dv = bleed_px - 1 - x
 
-                c_pixels[x, y] = h_pixels[x, y] if use_h else v_pixels[x, y]
+                total = dh + dv
+                if total <= 0:
+                    t = 0.5
+                else:
+                    # t is weight of vertical source. On the 45° line this becomes 0.5.
+                    t = dv / total
+
+                c_pixels[x, y] = blend_pixel(h_pixels[x, y], v_pixels[x, y], t)
 
         canvas.paste(corner, (dest_x, dest_y))
 
