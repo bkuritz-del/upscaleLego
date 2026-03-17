@@ -22,7 +22,7 @@ RESAMPLE_MAP = {
 class UpscaleSettings:
     input_dir: Path
     output_dir: Path
-    scale_percent: float = 1027.0
+    scale_percent: float = 1027.636
     dpi: int = 300
     bleed_inches: float = 1.0
     bleed_mode: str = "dominant"  # dominant, edge, mirror, custom
