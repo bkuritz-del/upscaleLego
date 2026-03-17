@@ -18,8 +18,7 @@ class UpscaleGUI:
         self.input_var = tk.StringVar()
         self.output_var = tk.StringVar()
 
-        self.out_width_var = tk.StringVar(value="12")
-        self.out_height_var = tk.StringVar(value="12")
+        self.scale_percent_var = tk.StringVar(value="1027")
         self.dpi_var = tk.StringVar(value="300")
         self.bleed_var = tk.StringVar(value="1.0")
 
@@ -90,20 +89,17 @@ class UpscaleGUI:
         ttk.Entry(parent, textvariable=self.output_var).grid(row=1, column=1, sticky="ew", padx=6, pady=4)
         ttk.Button(parent, text="Browse", command=self.browse_output).grid(row=1, column=2, pady=4)
 
-        ttk.Label(parent, text="Artwork Width (inches)").grid(row=2, column=0, sticky="w", pady=4)
-        ttk.Entry(parent, textvariable=self.out_width_var, width=12).grid(row=2, column=1, sticky="w", padx=6, pady=4)
+        ttk.Label(parent, text="Scale Percent").grid(row=2, column=0, sticky="w", pady=4)
+        ttk.Entry(parent, textvariable=self.scale_percent_var, width=12).grid(row=2, column=1, sticky="w", padx=6, pady=4)
 
-        ttk.Label(parent, text="Artwork Height (inches)").grid(row=3, column=0, sticky="w", pady=4)
-        ttk.Entry(parent, textvariable=self.out_height_var, width=12).grid(row=3, column=1, sticky="w", padx=6, pady=4)
+        ttk.Label(parent, text="DPI").grid(row=3, column=0, sticky="w", pady=4)
+        ttk.Combobox(parent, textvariable=self.dpi_var, values=["150", "300", "600"], state="readonly", width=10).grid(row=3, column=1, sticky="w", padx=6, pady=4)
 
-        ttk.Label(parent, text="DPI").grid(row=4, column=0, sticky="w", pady=4)
-        ttk.Combobox(parent, textvariable=self.dpi_var, values=["150", "300", "600"], state="readonly", width=10).grid(row=4, column=1, sticky="w", padx=6, pady=4)
+        ttk.Label(parent, text="Bleed (inches each side)").grid(row=4, column=0, sticky="w", pady=4)
+        ttk.Combobox(parent, textvariable=self.bleed_var, values=["0", "0.125", "0.25", "0.5", "1.0"], width=10).grid(row=4, column=1, sticky="w", padx=6, pady=4)
 
-        ttk.Label(parent, text="Bleed (inches each side)").grid(row=5, column=0, sticky="w", pady=4)
-        ttk.Combobox(parent, textvariable=self.bleed_var, values=["0", "0.125", "0.25", "0.5", "1.0"], width=10).grid(row=5, column=1, sticky="w", padx=6, pady=4)
-
-        ttk.Checkbutton(parent, text="Process subfolders recursively", variable=self.recursive_var).grid(row=6, column=0, columnspan=2, sticky="w", pady=6)
-        ttk.Checkbutton(parent, text="Pad image to square before scaling", variable=self.pad_square_var).grid(row=7, column=0, columnspan=2, sticky="w", pady=6)
+        ttk.Checkbutton(parent, text="Process subfolders recursively", variable=self.recursive_var).grid(row=5, column=0, columnspan=2, sticky="w", pady=6)
+        ttk.Checkbutton(parent, text="Pad image to square before scaling", variable=self.pad_square_var).grid(row=6, column=0, columnspan=2, sticky="w", pady=6)
 
     def _build_processing_tab(self, parent):
         parent.columnconfigure(1, weight=1)
@@ -193,11 +189,14 @@ class UpscaleGUI:
         if not self.input_var.get().strip() or not self.output_var.get().strip():
             raise ValueError("Please choose both input and output folders.")
 
+        scale_percent = float(self.scale_percent_var.get())
+        if scale_percent <= 0:
+            raise ValueError("Scale Percent must be greater than 0.")
+
         return UpscaleSettings(
             input_dir=input_dir,
             output_dir=output_dir,
-            out_width_inches=float(self.out_width_var.get()),
-            out_height_inches=float(self.out_height_var.get()),
+            scale_percent=scale_percent,
             dpi=int(self.dpi_var.get()),
             bleed_inches=float(self.bleed_var.get()),
             bleed_mode=self.bleed_mode_var.get(),
@@ -257,7 +256,7 @@ class UpscaleGUI:
         self.log(f"Saved: {summary['saved']}")
         self.log(f"Skipped existing: {summary['skipped']}")
         self.log(f"Failed: {summary['failed']}")
-        self.log(f"Artwork size: {summary['art_width_px']} x {summary['art_height_px']} px")
+        self.log(f"Scale Percent: {summary.get('scale_percent', 'N/A')}%")
         self.log(f"Bleed per side: {summary['bleed_px']} px")
         self.log(f"Final output size: {summary['final_width_px']} x {summary['final_height_px']} px")
         messagebox.showinfo("Complete", "Processing completed.")
