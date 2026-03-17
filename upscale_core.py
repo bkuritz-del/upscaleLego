@@ -109,7 +109,7 @@ def get_background_fill(
     return get_auto_background_fill(img)
 
 
-def pad_to_square(
+def pad_to_square_canvas(
     img: Image.Image,
     background_mode: str = "auto",
     custom_color: tuple[int, int, int] | None = None,
@@ -145,7 +145,11 @@ def resize_two_step(img: Image.Image, target_size: tuple[int, int], resample: in
     return out
 
 
-def add_bleed_dominant(img: Image.Image, bleed_px: int, custom_color: tuple[int, int, int] | None = None) -> Image.Image:
+def add_bleed_dominant(
+    img: Image.Image,
+    bleed_px: int,
+    custom_color: tuple[int, int, int] | None = None,
+) -> Image.Image:
     width, height = img.size
     dominant = custom_color if custom_color is not None else get_dominant_color(img)
 
@@ -217,14 +221,31 @@ def add_bleed_mirror(img: Image.Image, bleed_px: int) -> Image.Image:
     expanded.paste(top, (bleed_px, 0))
     expanded.paste(bottom, (bleed_px, bleed_px + height))
 
-    expanded.paste(top.crop((0, 0, bleed_px, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT), (0, 0))
-    expanded.paste(top.crop((width - bleed_px, 0, width, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT), (bleed_px + width, 0))
-    expanded.paste(bottom.crop((0, 0, bleed_px, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT), (0, bleed_px + height))
-    expanded.paste(bottom.crop((width - bleed_px, 0, width, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT), (bleed_px + width, bleed_px + height))
+    expanded.paste(
+        top.crop((0, 0, bleed_px, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        (0, 0),
+    )
+    expanded.paste(
+        top.crop((width - bleed_px, 0, width, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        (bleed_px + width, 0),
+    )
+    expanded.paste(
+        bottom.crop((0, 0, bleed_px, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        (0, bleed_px + height),
+    )
+    expanded.paste(
+        bottom.crop((width - bleed_px, 0, width, bleed_px)).transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        (bleed_px + width, bleed_px + height),
+    )
     return expanded
 
 
-def add_bleed(img: Image.Image, bleed_px: int, mode: str, custom_color: tuple[int, int, int] | None = None) -> Image.Image:
+def add_bleed(
+    img: Image.Image,
+    bleed_px: int,
+    mode: str,
+    custom_color: tuple[int, int, int] | None = None,
+) -> Image.Image:
     if bleed_px <= 0:
         return img
     if mode == "edge":
@@ -262,10 +283,8 @@ def save_with_dpi(img: Image.Image, out_path: Path, dpi: int, quality: int) -> N
         elif img.mode != "RGB":
             img = img.convert("RGB")
         save_kwargs.update({"quality": quality, "optimize": True, "progressive": True})
-
     elif ext == ".png":
         save_kwargs.update({"optimize": True})
-
     elif ext == ".webp":
         save_kwargs.update({"quality": quality, "method": 6})
 
@@ -288,7 +307,7 @@ def process_one_image(src: Path, settings: UpscaleSettings) -> tuple[bool, str]:
         img = ensure_mode(img)
 
         if settings.pad_to_square:
-            img = pad_to_square(img, settings.background_mode, settings.custom_background_color)
+            img = pad_to_square_canvas(img, settings.background_mode, settings.custom_background_color)
 
         original_width, original_height = img.size
         target_width_px = max(1, int(round(original_width * scale_factor)))
@@ -329,7 +348,9 @@ def process_batch(
 
     files = list(iter_images(settings.input_dir, settings.recursive))
     total = len(files)
-    saved = skipped = failed = 0
+    saved = 0
+    skipped = 0
+    failed = 0
 
     preview_width_px = 0
     preview_height_px = 0
@@ -343,7 +364,11 @@ def process_batch(
             preview_img.load()
             preview_img = ensure_mode(preview_img)
             if settings.pad_to_square:
-                preview_img = pad_to_square(preview_img, settings.background_mode, settings.custom_background_color)
+                preview_img = pad_to_square_canvas(
+                    preview_img,
+                    settings.background_mode,
+                    settings.custom_background_color,
+                )
 
             preview_width_px = max(1, int(round(preview_img.width * scale_factor)))
             preview_height_px = max(1, int(round(preview_img.height * scale_factor)))
@@ -375,7 +400,4 @@ def process_batch(
         "bleed_px": bleed_px,
         "final_width_px": final_width_px,
         "final_height_px": final_height_px,
-    }
-        "final_width_px": int(round(settings.out_width_inches * settings.dpi)) + 2 * int(round(settings.bleed_inches * settings.dpi)),
-        "final_height_px": int(round(settings.out_height_inches * settings.dpi)) + 2 * int(round(settings.bleed_inches * settings.dpi)),
     }
