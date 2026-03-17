@@ -22,10 +22,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Show repo files
+        run: dir
 
       - name: Build GUI executable
         run: |
-          pyinstaller --onefile --windowed --name LEGOPrintUpscaler gui_upscale_v2.py
+          pyinstaller --clean --noconfirm --onefile --windowed --name LEGOPrintUpscaler --paths=. --hidden-import=upscale_core gui_upscale_v2.py
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
