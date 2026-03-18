@@ -1,27 +1,24 @@
-def rgb_to_cmyk(rgb: tuple[int, int, int]) -> tuple[int, int, int, int]:
-    """
-    Convert an RGB color tuple to CMYK.
-    
-    Args:
-        rgb: A tuple of (R, G, B) values, each 0-255
+class UpscaleSettings:
+    def __init__(self, scale_factor, output_directory):
+        self.scale_factor = scale_factor
+        self.output_directory = output_directory
         
-    Returns:
-        A tuple of (C, M, Y, K) values, each 0-255
-    """
-    r, g, b = rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
-    
-    k = 1.0 - max(r, g, b)
-    
-    if k == 1.0:
-        return (0, 0, 0, 255)
-    
-    c = (1.0 - r - k) / (1.0 - k)
-    m = (1.0 - g - k) / (1.0 - k)
-    y = (1.0 - b - k) / (1.0 - k)
-    
-    return (
-        int(round(c * 255)),
-        int(round(m * 255)),
-        int(round(y * 255)),
-        int(round(k * 255)),
-    )
+    def validate(self):
+        if self.scale_factor <= 0:
+            raise ValueError("Scale factor must be greater than 0")
+        if not os.path.exists(self.output_directory):
+            raise ValueError("Output directory does not exist")
+
+
+def process_batch(input_images, upscale_settings):
+    upscale_settings.validate()
+    for image_path in input_images:
+        # Load the image
+        image = load_image(image_path)
+        
+        # Process image
+        upscaled_image = upscale_image(image, upscale_settings.scale_factor)
+        
+        # Save the upscaled image
+        output_path = os.path.join(upscale_settings.output_directory, os.path.basename(image_path))
+        save_image(upscaled_image, output_path)
