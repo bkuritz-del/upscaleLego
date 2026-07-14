@@ -607,27 +607,30 @@ def process_one_image(src: Path, settings: UpscaleSettings) -> tuple[bool, str]:
         if settings.pad_to_square:
             img = pad_to_square_canvas(img, settings.background_mode, settings.custom_background_color)
 
-        original_width, original_height = img.size
-        target_width_px = max(1, int(round(original_width * scale_factor)))
-        target_height_px = max(1, int(round(original_height * scale_factor)))
-        target_size = (target_width_px, target_height_px)
+       original_width, original_height = img.size
 
-        if settings.resample == "edge_directed":
-            out = resize_edge_directed(
-                img,
-                target_size,
-                two_step=settings.two_step,
-                base_resample=Image.Resampling.LANCZOS,
-                edge_strength=0.35,
-                edge_gamma=0.8,
-            )
+if settings.scale_percent <= 0:
+    out = img.copy()
+else:
+    target_width_px = max(1, int(round(original_width * scale_factor)))
+    target_height_px = max(1, int(round(original_height * scale_factor)))
+    target_size = (target_width_px, target_height_px)
+
+    if settings.resample == "edge_directed":
+        out = resize_edge_directed(
+            img,
+            target_size,
+            two_step=settings.two_step,
+            base_resample=Image.Resampling.LANCZOS,
+            edge_strength=0.35,
+            edge_gamma=0.8,
+        )
+    else:
+        resample = RESAMPLE_MAP[settings.resample]
+        if settings.two_step:
+            out = resize_two_step(img, target_size, resample)
         else:
-            resample = RESAMPLE_MAP[settings.resample]
-            if settings.two_step:
-                out = resize_two_step(img, target_size, resample)
-            else:
-                out = img.resize(target_size, resample=resample)
-
+            out = img.resize(target_size, resample=resample)
         if settings.sharpen_enabled:
             out = out.filter(
                 ImageFilter.UnsharpMask(
