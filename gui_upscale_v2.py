@@ -188,7 +188,7 @@ class UpscaleGUI:
             raise ValueError("Color values must be between 0 and 255")
         return rgb
 
-        def build_settings(self) -> UpscaleSettings:
+    def build_settings(self) -> UpscaleSettings:
         input_dir = Path(self.input_var.get().strip())
         output_dir = Path(self.output_var.get().strip())
 
