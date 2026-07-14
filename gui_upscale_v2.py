@@ -188,16 +188,16 @@ class UpscaleGUI:
             raise ValueError("Color values must be between 0 and 255")
         return rgb
 
-    def build_settings(self) -> UpscaleSettings:
+        def build_settings(self) -> UpscaleSettings:
         input_dir = Path(self.input_var.get().strip())
         output_dir = Path(self.output_var.get().strip())
 
         if not self.input_var.get().strip() or not self.output_var.get().strip():
             raise ValueError("Please choose both input and output folders.")
 
-scale_percent = float(self.scale_percent_var.get())
-if scale_percent < 0:
-    raise ValueError("Scale Percent must be 0 or greater.")
+        scale_percent = float(self.scale_percent_var.get())
+        if scale_percent < 0:
+            raise ValueError("Scale Percent must be 0 or greater.")
 
         return UpscaleSettings(
             input_dir=input_dir,
