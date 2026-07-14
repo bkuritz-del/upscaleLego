@@ -681,10 +681,15 @@ def process_batch(
                     settings.custom_background_color,
                 )
 
-            preview_width_px = max(1, int(round(preview_img.width * scale_factor)))
-            preview_height_px = max(1, int(round(preview_img.height * scale_factor)))
-            final_width_px = preview_width_px + (2 * bleed_px)
-            final_height_px = preview_height_px + (2 * bleed_px)
+if settings.scale_percent <= 0:
+    preview_width_px = preview_img.width
+    preview_height_px = preview_img.height
+else:
+    preview_width_px = max(1, int(round(preview_img.width * scale_factor)))
+    preview_height_px = max(1, int(round(preview_img.height * scale_factor)))
+
+final_width_px = preview_width_px + (2 * bleed_px)
+final_height_px = preview_height_px + (2 * bleed_px)
 
     for idx, src in enumerate(files, start=1):
         try:
