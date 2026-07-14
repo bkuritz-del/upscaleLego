@@ -195,9 +195,9 @@ class UpscaleGUI:
         if not self.input_var.get().strip() or not self.output_var.get().strip():
             raise ValueError("Please choose both input and output folders.")
 
-        scale_percent = float(self.scale_percent_var.get())
-        if scale_percent <= 0:
-            raise ValueError("Scale Percent must be greater than 0.")
+scale_percent = float(self.scale_percent_var.get())
+if scale_percent < 0:
+    raise ValueError("Scale Percent must be 0 or greater.")
 
         return UpscaleSettings(
             input_dir=input_dir,
